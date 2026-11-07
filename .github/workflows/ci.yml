@@ -16,7 +16,7 @@ jobs:
           node-version: 24
 
       - name: Unit + API tests (no dependencies)
-        run: node --test tests/
+        run: node --test "tests/**/*.test.js"
 
       - name: Worker entry imports cleanly
         run: node -e "import('./src/index.js').then(() => console.log('worker entry ok'))"

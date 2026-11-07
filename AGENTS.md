@@ -54,7 +54,7 @@ no telemetry.
 ## Commands
 
 ```bash
-node --test tests/            # tests (no install, no network)
+node --test "tests/**/*.test.js"   # tests (no install, no network)
 node scripts/setup.mjs --dry-run --skip-deploy   # print deploy commands
 npm run preview               # local dashboard: http://127.0.0.1:8787/dashboard
 npm run dev                   # wrangler dev (needs .dev.vars)
@@ -120,7 +120,7 @@ Use `stats --json` and compute from the payload instead of guessing:
 
 ## Definition of done
 
-- `node --test tests/` passes.
+- `node --test "tests/**/*.test.js"` passes.
 - No new dependencies, no PII fields, no inline scripts/styles in dashboard HTML.
 - Public API/schema changes are documented.
 - Secrets are not written to tracked files; `.mintly-setup.json` stays ignored.
