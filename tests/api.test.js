@@ -58,6 +58,9 @@ test('dashboard and assets are served with strict headers', async () => {
   const html = await page.text();
   assert.match(html, /Mintly/);
   assert.match(html, /\/assets\/app\.js/);
+  assert.match(html, /id="token-toggle"/);
+  assert.match(html, /M9 22V9l7 7 7-7v13/);
+  assert.ok(!/All apps/.test(html), 'the app selector has no all-apps option');
   assert.ok(!/style="/.test(html), 'dashboard HTML must not use inline style attributes (CSP)');
 
   const css = await call(env, 'GET', '/assets/app.css');
@@ -73,6 +76,14 @@ test('dashboard and assets are served with strict headers', async () => {
   assert.ok(source.length > 5000);
   assert.ok(!/style="/.test(source), 'dashboard JS must not build inline style attributes (CSP)');
   assert.doesNotThrow(() => new Function(source)); // generated browser JS parses
+});
+
+test('unconfigured deployment returns a helpful 503', async () => {
+  const env = makeEnv({ STATS_TOKEN: undefined, ADMIN_TOKEN: undefined });
+  const response = await call(env, 'GET', '/v1/apps', { token: 'anything' });
+  assert.equal(response.status, 503);
+  const body = await response.json();
+  assert.match(body.error, /not configured/i);
 });
 
 test('read API requires a token', async () => {
@@ -136,7 +147,31 @@ test('ingest validates keys and bodies, then aggregates', async () => {
     { event: 'ui_click', count: 2 },
     { event: 'app_open', count: 1 },
   ]);
+  assert.deepEqual(demo.buttons.map((entry) => entry.dim1).sort(), ['home.blue_button', 'home.red_button']);
   assert.equal(demo.top[0].count, 1);
+});
+
+test('ingest accepts a local timezone offset header', async () => {
+  const env = makeEnv();
+  const created = await createApp(env);
+  const response = await worker.fetch(new Request(ORIGIN + '/v1/event', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-App-Key': created.key,
+      'X-Mintly-Tz': '345',
+    },
+    body: JSON.stringify({ event: 'ui_click', dim1: 'home.cta' }),
+  }), env);
+  assert.equal(response.status, 202);
+});
+
+test('stats echoes the requested timezone offset', async () => {
+  const env = makeEnv();
+  await createApp(env);
+  const stats = await call(env, 'GET', '/v1/stats?days=7&tz=345', { token: STATS_TOKEN }).then((r) => r.json());
+  assert.equal(stats.timezoneOffsetMinutes, 345);
+  assert.equal(stats.days.length, 7);
 });
 
 test('registry is manageable and flags unknown labels server-side when enforced', async () => {

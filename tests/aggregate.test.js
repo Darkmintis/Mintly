@@ -34,6 +34,10 @@ test('buildStats totals, series and today bucket', () => {
     { event: 'ui_click', dim1: 'home.red_button', count: 3 },
     { event: 'ui_click', dim1: 'home.blue_button', count: 2 },
   ]);
+  assert.deepEqual(demo.buttons, [
+    { dim1: 'home.red_button', count: 3 },
+    { dim1: 'home.blue_button', count: 2 },
+  ]);
 });
 
 test('buildStats flags unregistered dims only when there is a registry entry', () => {

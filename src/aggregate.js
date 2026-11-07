@@ -53,6 +53,7 @@ export function buildStats({ rows, apps, registry, days }) {
       series: days.map((day) => ({ day, count: 0 })),
       events: new Map(),
       dims: new Map(),
+      buttons: new Map(),
       unregistered: new Map(),
     });
   }
@@ -68,6 +69,7 @@ export function buildStats({ rows, apps, registry, days }) {
     sumMap(bucket.events, row.event, count);
 
     if (row.dim1) sumMap(bucket.dims, `${row.event}\u0000${row.dim1}`, count);
+    if (row.event === 'ui_click' && row.dim1) sumMap(bucket.buttons, row.dim1, count);
 
     // Flag traffic whose dim1 is not declared in the app registry, so typos and
     // forgotten buttons are visible in the dashboard.
@@ -90,6 +92,10 @@ export function buildStats({ rows, apps, registry, days }) {
         })
         .sort((a, b) => b.count - a.count)
         .slice(0, TOP_LIMIT);
+      const buttons = [...bucket.buttons.entries()]
+        .map(([dim1, count]) => ({ dim1, count }))
+        .sort((a, b) => b.count - a.count)
+        .slice(0, TOP_LIMIT);
       const unregistered = [...bucket.unregistered.entries()]
         .map(([key, count]) => {
           const [event, dim1] = key.split('\u0000');
@@ -104,6 +110,7 @@ export function buildStats({ rows, apps, registry, days }) {
         today: bucket.today,
         series: bucket.series,
         events,
+        buttons,
         top,
         unregistered,
       };

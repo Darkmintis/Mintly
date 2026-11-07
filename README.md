@@ -90,11 +90,25 @@ Data model (see [`migrations/0001_init.sql`](migrations/0001_init.sql)):
 Served by the same Worker, same origin, strict CSP (`default-src 'none'`), no
 cookies, no external assets:
 
-- **Overview** — totals, daily chart, per-app counts, top buttons across apps.
+- **Overview** — totals, daily chart, per-app counts, top buttons.
 - **App view** — top buttons with bars, event breakdown, approximate CTR
   (`ui_click ÷ screen_view`), unregistered-label warnings.
 - **Registry** — read-only list of declared events/buttons (CLI manages it).
-- **Settings** — token (masked), endpoints, curl snippets, CLI examples.
+- **Settings** — default app (saved in the browser), local timezone, token
+  (masked), endpoints, curl snippets, CLI examples.
+
+There is no "all apps" view: the dashboard opens the alphabetically first app
+and remembers your choice. Day buckets follow the local calendar of whoever
+sends the event; the dashboard displays your local time.
+
+Preview it locally with seeded demo data (no Cloudflare account, no network):
+
+```bash
+npm run preview   # http://127.0.0.1:8787/dashboard · token: preview-local-token
+```
+
+The preview runs the real Worker code against an in-memory D1 stand-in with two
+weeks of demo data for four apps (Blink, Flare, NeverEnd, LinkMesh).
 
 ## Agent usage
 
@@ -112,9 +126,10 @@ end-to-end workflows.
 ## Privacy
 
 Mintly stores **aggregate counts only**. No IP addresses, user agents, cookies,
-user IDs, device IDs, referrers, or file contents. No telemetry inside Mintly
-itself. Nothing is sent to a third party — you own the Worker, the database and
-the dashboard. See [`SECURITY.md`](SECURITY.md).
+user IDs, device IDs, referrers, or file contents. Day buckets follow the
+sender's local calendar date; the timezone offset itself is never stored. No
+telemetry inside Mintly itself. Nothing is sent to a third party — you own the
+Worker, the database and the dashboard. See [`SECURITY.md`](SECURITY.md).
 
 ## Cloudflare-only (for now)
 

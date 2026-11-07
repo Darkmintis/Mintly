@@ -11,7 +11,7 @@ export const DASHBOARD_HTML = `<!doctype html>
 <meta name="description" content="Anonymous, cookie-free product analytics. Clicks, app opens, counts. Self-hosted on Cloudflare.">
 <meta name="theme-color" content="#070b0a">
 <meta name="robots" content="noindex, nofollow">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='9' fill='%235eead4'/%3E%3Cpath d='M9 21V12l7 5 7-5v9' stroke='%23070b0a' stroke-width='2.4' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='9' fill='%235eead4'/%3E%3Cpath d='M9 22V9l7 7 7-7v13' stroke='%2304231d' stroke-width='3' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
 <link rel="stylesheet" href="/assets/app.css">
 </head>
 <body>
@@ -20,7 +20,7 @@ export const DASHBOARD_HTML = `<!doctype html>
   <div class="login-card">
     <div class="brand brand-lg">
       <span class="brand-mark" aria-hidden="true">
-        <svg viewBox="0 0 32 32" width="34" height="34"><rect width="32" height="32" rx="9" fill="#5eead4"/><path d="M9 21V12l7 5 7-5v9" stroke="#070b0a" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <svg viewBox="0 0 32 32" width="34" height="34"><rect width="32" height="32" rx="9" fill="#5eead4"/><path d="M9 22V9l7 7 7-7v13" stroke="#04231d" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
       </span>
       <span class="brand-name">Mintly</span>
     </div>
@@ -29,7 +29,13 @@ export const DASHBOARD_HTML = `<!doctype html>
       <code>STATS_TOKEN</code> printed by <code>npm run setup</code>.</p>
     <form id="login-form" autocomplete="off">
       <label class="field-label" for="token-input">Stats token</label>
-      <input id="token-input" class="field" type="password" placeholder="paste STATS_TOKEN" spellcheck="false" autocomplete="off">
+      <div class="field-wrap">
+        <input id="token-input" class="field" type="password" placeholder="paste STATS_TOKEN" spellcheck="false" autocomplete="off">
+        <button id="token-toggle" class="field-toggle" type="button" aria-label="Show token" title="Show token">
+          <svg class="eye-open" viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><path d="M1.8 10S4.8 5 10 5s8.2 5 8.2 5-3 5-8.2 5-8.2-5-8.2-5Z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><circle cx="10" cy="10" r="2.4" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>
+          <svg class="eye-closed" viewBox="0 0 20 20" width="18" height="18" aria-hidden="true" hidden><path d="M1.8 10S4.8 5 10 5s8.2 5 8.2 5-3 5-8.2 5-8.2-5-8.2-5Z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M3.4 3.4l13.2 13.2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+        </button>
+      </div>
       <button id="login-btn" class="btn btn-primary" type="submit">Open dashboard</button>
       <p id="login-error" class="login-error" hidden></p>
     </form>
@@ -41,7 +47,7 @@ export const DASHBOARD_HTML = `<!doctype html>
   <aside class="sidebar">
     <div class="brand">
       <span class="brand-mark" aria-hidden="true">
-        <svg viewBox="0 0 32 32" width="28" height="28"><rect width="32" height="32" rx="9" fill="#5eead4"/><path d="M9 21V12l7 5 7-5v9" stroke="#070b0a" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <svg viewBox="0 0 32 32" width="28" height="28"><rect width="32" height="32" rx="9" fill="#5eead4"/><path d="M9 22V9l7 7 7-7v13" stroke="#04231d" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
       </span>
       <span class="brand-name">Mintly</span>
     </div>
@@ -55,7 +61,7 @@ export const DASHBOARD_HTML = `<!doctype html>
         <span>Registry</span>
       </button>
       <button class="nav-item" data-tab="settings">
-        <svg viewBox="0 0 20 20" width="17" height="17" aria-hidden="true"><circle cx="10" cy="10" r="2.6" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M10 2.8v2M10 15.2v2M2.8 10h2M15.2 10h2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+        <svg viewBox="0 0 20 20" width="17" height="17" aria-hidden="true"><path d="M2.8 6.5h6.6M14 6.5h3.2M2.8 13.5h2M8.9 13.5h8.3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><circle cx="11.7" cy="6.5" r="2.1" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="6.9" cy="13.5" r="2.1" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>
         <span>Settings</span>
       </button>
     </nav>
@@ -72,9 +78,7 @@ export const DASHBOARD_HTML = `<!doctype html>
         <p id="page-sub" class="muted">Anonymous counts · no cookies · no identifiers</p>
       </div>
       <div class="controls">
-        <select id="app-select" class="select" aria-label="App">
-          <option value="">All apps</option>
-        </select>
+        <select id="app-select" class="select" aria-label="App"></select>
         <div class="segmented" id="range" role="group" aria-label="Range">
           <button data-days="7" class="is-active">7d</button>
           <button data-days="30">30d</button>

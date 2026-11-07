@@ -45,6 +45,7 @@ no telemetry.
 | `cli/mintly.mjs` | agent-friendly CLI (`--json`, stable exit codes) |
 | `mcp/server.mjs` | MCP stdio tools |
 | `scripts/setup.mjs` | one-command deploy (`--dry-run` supported) |
+| `scripts/preview.mjs` | local dashboard preview with seeded demo data (in-memory D1) |
 | `migrations/` | D1 schema; never edit an applied migration |
 | `sdk/js/` | optional zero-dep JS SDK (`@darkmintis/mintly`) |
 | `examples/` | Flutter, React Native, web helpers |
@@ -55,6 +56,7 @@ no telemetry.
 ```bash
 node --test tests/            # tests (no install, no network)
 node scripts/setup.mjs --dry-run --skip-deploy   # print deploy commands
+npm run preview               # local dashboard: http://127.0.0.1:8787/dashboard
 npm run dev                   # wrangler dev (needs .dev.vars)
 npm run deploy                # wrangler deploy
 node cli/mintly.mjs help      # CLI
@@ -100,6 +102,9 @@ Use `stats --json` and compute from the payload instead of guessing:
 
 - Which button wins? group by `dim1` where `event === "ui_click"`.
 - Click-through proxy: `ui_click / screen_view` (counts only, no sessions).
+- Day buckets are local-calendar buckets. Ingest accepts `X-Mintly-Tz`
+  (minutes, east positive); the CLI/stats API send `tz` automatically. The
+  offset is never stored.
 - Forgotten labels show up in each app's `unregistered` array.
 
 ## Workflow: change the API or schema

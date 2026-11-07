@@ -2,8 +2,10 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
+  dayKey,
   dayRange,
   parseDays,
+  parseTz,
   utcDay,
   validateAppBody,
   validateEventBody,
@@ -20,6 +22,27 @@ test('dayRange returns the requested number of ascending UTC days', () => {
   assert.equal(days.length, 7);
   assert.equal(days[0], '2026-11-01');
   assert.equal(days[6], '2026-11-07');
+});
+
+test('day bucketing follows the client timezone offset', () => {
+  // 2026-11-07T20:00Z is already 2026-11-08 in Nepal (UTC+5:45).
+  const evening = new Date('2026-11-07T20:00:00Z');
+  assert.equal(dayKey(evening), '2026-11-07');
+  assert.equal(dayKey(evening, 345), '2026-11-08');
+  assert.equal(dayKey(evening, -300), '2026-11-07');
+
+  const range = dayRange(3, evening, 345);
+  assert.deepEqual(range, ['2026-11-06', '2026-11-07', '2026-11-08']);
+});
+
+test('parseTz clamps and rejects bad offsets', () => {
+  assert.equal(parseTz('345'), 345);
+  assert.equal(parseTz('-300'), -300);
+  assert.equal(parseTz('840'), 840);
+  assert.equal(parseTz('841'), 0);
+  assert.equal(parseTz('-841'), 0);
+  assert.equal(parseTz('nope'), 0);
+  assert.equal(parseTz(undefined), 0);
 });
 
 test('parseDays clamps to 1..365 with a fallback', () => {

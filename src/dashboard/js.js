@@ -7,10 +7,12 @@ export const DASHBOARD_JS = `(function () {
   'use strict';
 
   var TOKEN_KEY = 'mintly_token';
+  var APP_KEY = 'mintly_app';
   var state = {
     token: sessionStorage.getItem(TOKEN_KEY) || '',
     days: 7,
-    app: '',
+    app: localStorage.getItem(APP_KEY) || '',
+    apps: [],
     tab: 'overview',
     data: null,
     registry: null,
@@ -26,6 +28,10 @@ export const DASHBOARD_JS = `(function () {
   function fmt(n) { return Number(n || 0).toLocaleString('en-US'); }
   function sum(values) { return values.reduce(function (a, b) { return a + b; }, 0); }
 
+  // Day buckets follow the visitor local calendar. The offset is sent with
+  // each request/event only to pick the bucket; it is never stored.
+  function tzOffset() { return -new Date().getTimezoneOffset(); }
+
   function toast(message, isError) {
     var el = $('#toast');
     el.textContent = message;
@@ -35,17 +41,63 @@ export const DASHBOARD_JS = `(function () {
     toast._timer = setTimeout(function () { el.hidden = true; }, 4200);
   }
 
+  function apiFailure(status, message) {
+    var error = new Error(message);
+    error.status = status;
+    return error;
+  }
+
+  function statusMessage(status) {
+    if (status === 401) return 'That token was rejected by this deployment.';
+    if (status === 403) return 'This token does not have access to that resource.';
+    if (status === 404) return 'Not found - the app or endpoint does not exist.';
+    if (status === 429) return 'Too many requests. Wait a minute and try again.';
+    if (status === 503) return 'This Mintly deployment is not configured yet.';
+    if (status >= 500) return 'The Mintly worker hit an error. Try again in a moment.';
+    return 'Request failed (' + status + ').';
+  }
+
+  function errorPanel(title, err) {
+    var message = err && err.message ? err.message : 'Unexpected error';
+    var hint = 'If this keeps happening, check the Worker logs (wrangler tail) and verify STATS_TOKEN.';
+    if (err && err.status === 0) hint = 'The dashboard cannot reach the Mintly worker. Check the deployment URL and your connection.';
+    else if (err && err.status === 429) hint = 'The read API is rate limited to 240 requests per minute. Wait a minute, then retry.';
+    else if (err && err.status === 503) hint = 'Set STATS_TOKEN and ADMIN_TOKEN with wrangler secret put, then redeploy.';
+    return '<div class="error-panel"><div class="error-title">' + esc(title) + '</div>'
+      + '<div class="error-hint">' + esc(message) + '</div>'
+      + '<div class="error-hint">' + esc(hint) + '</div>'
+      + '<div class="error-actions"><button class="retry-btn" data-retry type="button">Try again</button></div></div>';
+  }
+
+  function loginMessage(err) {
+    if (err && err.status === 0) return 'Cannot reach this Mintly worker - check the URL and your connection.';
+    if (err && err.status === 401) return 'Token rejected. Paste the STATS_TOKEN (or ADMIN_TOKEN) printed by npm run setup.';
+    if (err && err.status === 429) return 'Too many attempts - wait a minute and try again.';
+    if (err && err.status === 503) return 'This deployment has no tokens configured yet. Run npm run setup first.';
+    return 'Could not sign in: ' + (err && err.message ? err.message : 'unknown error');
+  }
+
+  function bindRetry(root, handler) {
+    var retry = root.querySelector('[data-retry]');
+    if (retry) retry.addEventListener('click', handler);
+  }
+
   async function api(path, options) {
     var init = Object.assign({ headers: { Authorization: 'Bearer ' + state.token } }, options || {});
-    var res = await fetch(path, init);
+    var res;
+    try {
+      res = await fetch(path, init);
+    } catch (e) {
+      throw apiFailure(0, 'Cannot reach the Mintly worker. Check the URL and your connection.');
+    }
     if (res.status === 401) {
       logout();
-      throw new Error('Session expired — paste your token again.');
+      throw apiFailure(401, statusMessage(401));
     }
     if (!res.ok) {
       var payload = null;
       try { payload = await res.json(); } catch (e) { payload = null; }
-      throw new Error((payload && payload.error) || ('Request failed (' + res.status + ')'));
+      throw apiFailure(res.status, (payload && payload.error) || statusMessage(res.status));
     }
     var type = res.headers.get('content-type') || '';
     return type.indexOf('application/json') !== -1 ? res.json() : res.text();
@@ -117,13 +169,17 @@ export const DASHBOARD_JS = `(function () {
   function allTop() {
     var merged = {};
     visibleApps().forEach(function (a) {
-      a.top.forEach(function (t) {
-        var key = t.event + ' | ' + t.dim1;
-        merged[key] = merged[key] || { event: t.event, dim1: t.dim1, count: 0 };
-        merged[key].count += t.count;
+      a.buttons.forEach(function (b) {
+        merged[b.dim1] = merged[b.dim1] || { dim1: b.dim1, count: 0 };
+        merged[b.dim1].count += b.count;
       });
     });
     return Object.keys(merged).map(function (k) { return merged[k]; });
+  }
+
+  function currentAppName() {
+    var match = state.apps.filter(function (a) { return a.app === state.app; })[0];
+    return match ? match.name : state.app;
   }
 
   function eventCount(event) {
@@ -166,7 +222,7 @@ export const DASHBOARD_JS = `(function () {
       + kpi('Events', fmt(total), lastDaysHint())
       + kpi('Clicks', fmt(clicks), 'event = ui_click')
       + kpi('App opens', fmt(opens), 'event = app_open')
-      + kpi('Today', fmt(today), 'since 00:00 UTC')
+      + kpi('Today', fmt(today), 'since midnight, your time')
       + '</div>';
 
     var warnHtml = warn.length === 0 ? '' : '<div class="banner"><div><strong>Unregistered buttons detected.</strong> '
@@ -175,25 +231,18 @@ export const DASHBOARD_JS = `(function () {
       + '. Add them with <code>mintly registry add</code> so typos stay visible.</div></div>';
 
     var sparkCard = '<div class="card card-pad-lg span-all"><div class="card-head">'
-      + '<span class="card-title">Daily events</span><span class="card-sub">' + state.data.rangeDays + ' days · UTC</span></div>'
+      + '<span class="card-title">Daily events</span><span class="card-sub">' + state.data.rangeDays + ' days</span></div>'
       + '<div class="spark">' + sparkline(series) + '</div></div>';
 
     var topCard = '<div class="card"><div class="card-head"><span class="card-title">Most clicked buttons</span>'
-      + '<span class="card-sub">' + (state.app ? esc(state.app) : 'all apps') + '</span></div>'
-      + barList(allTop(), function (t) { return t.count; }, function (t) { return '<span class="mono">' + esc(t.dim1 || t.event) + '</span>'; }, 10)
+      + '<span class="card-sub">' + esc(currentAppName()) + '</span></div>'
+      + barList(allTop(), function (t) { return t.count; }, function (t) {
+        return '<span class="mono">' + esc(t.dim1) + '</span>';
+      }, 10)
       + '</div>';
 
-    var appsCard = '<div class="card"><div class="card-head"><span class="card-title">Apps</span>'
-      + '<span class="card-sub">' + apps.length + ' active</span></div>'
-      + '<table class="table"><thead><tr><th>App</th><th class="num">Today</th><th class="num">' + state.data.rangeDays + 'd</th></tr></thead><tbody>'
-      + apps.map(function (a) {
-        return '<tr><td><span class="app-cell"><span class="dot"></span><b>' + esc(a.name) + '</b></span></td>'
-          + '<td class="num">' + fmt(a.today) + '</td><td class="num">' + fmt(a.total) + '</td></tr>';
-      }).join('')
-      + '</tbody></table></div>';
-
     var eventsCard = '<div class="card card-pad-lg span-all"><div class="card-head">'
-      + '<span class="card-title">Events</span><span class="card-sub">' + (state.app ? esc(state.app) : 'all apps') + '</span></div>'
+      + '<span class="card-title">Events</span><span class="card-sub">' + esc(currentAppName()) + '</span></div>'
       + '<table class="table"><thead><tr><th>Event</th><th class="num">Count</th><th class="num">Share</th></tr></thead><tbody>'
       + (function () {
         var merged = {};
@@ -210,7 +259,7 @@ export const DASHBOARD_JS = `(function () {
       })()
       + '</tbody></table></div>';
 
-    root.innerHTML = kpis + warnHtml + '<div class="split">' + sparkCard + topCard + appsCard + eventsCard + '</div>';
+    root.innerHTML = kpis + warnHtml + '<div class="split">' + sparkCard + topCard + eventsCard + '</div>';
     applyBarWidths(root);
   }
 
@@ -253,7 +302,8 @@ export const DASHBOARD_JS = `(function () {
       root.innerHTML = html;
       applyBarWidths(root);
     }).catch(function (err) {
-      root.innerHTML = '<div class="empty"><div class="empty-title">Could not load registry</div><div class="empty-sub">' + esc(err.message) + '</div></div>';
+      root.innerHTML = errorPanel('Could not load registry', err);
+      bindRetry(root, renderRegistry);
     });
   }
 
@@ -268,12 +318,20 @@ export const DASHBOARD_JS = `(function () {
       '  body: {"event":"ui_click","dim1":"home.red_button"}'].join(sep);
     var curlStats = ['curl ' + origin + '/v1/stats?days=7',
       '  -H "Authorization: Bearer $STATS_TOKEN"'].join(sep);
+    var apps = state.apps;
+    var appOptions = apps.map(function (a) {
+      return '<option value="' + esc(a.app) + '"' + (a.app === state.app ? ' selected' : '') + '>' + esc(a.name) + '</option>';
+    }).join('');
     root.innerHTML = '<div class="split">'
       + '<div class="card card-pad-lg"><div class="card-head"><span class="card-title">Ingest endpoint</span><span class="card-sub">POST</span></div>'
       + '<div class="codeblock"><button class="copy-btn" data-copy="' + esc(curlEvent) + '">Copy</button><pre>' + esc(curlEvent) + '</pre></div>'
-      + '<p class="card-sub mt-12">Send from servers, apps, or browsers. The UTC day and app identity are assigned by Mintly.</p></div>'
+      + '<p class="card-sub mt-12">Send from servers, apps, or browsers. The local calendar day and app identity are assigned by Mintly.</p></div>'
       + '<div class="card card-pad-lg"><div class="card-head"><span class="card-title">Read API</span><span class="card-sub">GET</span></div>'
       + '<div class="codeblock"><button class="copy-btn" data-copy="' + esc(curlStats) + '">Copy</button><pre>' + esc(curlStats) + '</pre></div>'
+      + '</div>'
+      + '<div class="card card-pad-lg"><div class="card-head"><span class="card-title">Preferences</span><span class="card-sub">saved in this browser</span></div>'
+      + '<div class="settings-row"><div class="kv"><dt>Default app</dt><dd>Selected automatically when you open the dashboard.</dd></div>'
+      + '<select id="default-app" class="select" aria-label="Default app">' + appOptions + '</select></div>'
       + '</div>'
       + '<div class="card card-pad-lg"><div class="card-head"><span class="card-title">Access</span><span class="card-sub">read-only token</span></div>'
       + '<div class="settings-row"><div class="kv"><dt>Stats token</dt><dd class="mono">' + esc(masked) + '</dd></div>'
@@ -290,6 +348,13 @@ export const DASHBOARD_JS = `(function () {
     if (copyToken) copyToken.addEventListener('click', function () { copy(state.token); });
     var copyOrigin = document.getElementById('copy-origin');
     if (copyOrigin) copyOrigin.addEventListener('click', function () { copy(origin); });
+    var defaultApp = document.getElementById('default-app');
+    if (defaultApp) defaultApp.addEventListener('change', function (e) {
+      state.app = e.target.value;
+      try { localStorage.setItem(APP_KEY, state.app); } catch (err) {}
+      document.getElementById('app-select').value = state.app;
+      refresh();
+    });
     $$('[data-copy]', root).forEach(function (btn) {
       btn.addEventListener('click', function () { copy(btn.getAttribute('data-copy')); });
     });
@@ -329,25 +394,31 @@ export const DASHBOARD_JS = `(function () {
     var root = document.getElementById('tab-overview');
     root.innerHTML = '<div class="skeleton"></div>';
     try {
-      var query = '?days=' + state.days + (state.app ? '&app=' + encodeURIComponent(state.app) : '');
-      state.data = await api('/v1/stats' + query);
+      var query = '?days=' + state.days + '&tz=' + tzOffset() + (state.app ? '&app=' + encodeURIComponent(state.app) : '');
+      var results = await Promise.all([api('/v1/stats' + query), api('/v1/apps')]);
+      state.data = results[0];
+      state.apps = results[1].apps;
       populateApps();
       renderOverview();
     } catch (err) {
-      root.innerHTML = '<div class="empty"><div class="empty-title">Could not load stats</div><div class="empty-sub">' + esc(err.message) + '</div></div>';
+      root.innerHTML = errorPanel('Could not load stats', err);
+      bindRetry(root, refresh);
     }
   }
 
   function populateApps() {
     var select = document.getElementById('app-select');
-    var current = state.app;
-    var apps = state.data ? state.data.apps : [];
-    var options = '<option value="">All apps</option>' + apps.map(function (a) {
+    var apps = state.apps;
+    // The API returns apps alphabetically; default to the first one.
+    select.innerHTML = apps.map(function (a) {
       return '<option value="' + esc(a.app) + '">' + esc(a.name) + '</option>';
     }).join('');
-    select.innerHTML = options;
-    if (current && apps.some(function (a) { return a.app === current; })) select.value = current;
-    else { state.app = ''; select.value = ''; }
+    var known = apps.some(function (a) { return a.app === state.app; });
+    if (!known) state.app = apps.length > 0 ? apps[0].app : '';
+    if (state.app) {
+      select.value = state.app;
+      try { localStorage.setItem(APP_KEY, state.app); } catch (err) {}
+    }
   }
 
   function bindUi() {
@@ -363,11 +434,30 @@ export const DASHBOARD_JS = `(function () {
     });
     document.getElementById('app-select').addEventListener('change', function (e) {
       state.app = e.target.value;
+      try { localStorage.setItem(APP_KEY, state.app); } catch (err) {}
       if (state.tab === 'overview') refresh();
       if (state.tab === 'registry') renderRegistry();
+      if (state.tab === 'settings') renderSettings();
     });
     document.getElementById('refresh').addEventListener('click', function () { refresh(); });
     document.getElementById('logout').addEventListener('click', logout);
+  }
+
+  function bindLoginToggle() {
+    var toggle = document.getElementById('token-toggle');
+    var input = document.getElementById('token-input');
+    if (!toggle || !input) return;
+    toggle.addEventListener('click', function () {
+      input.type = input.type === 'password' ? 'text' : 'password';
+      var isText = input.type === 'text';
+      var open = toggle.querySelector('.eye-open');
+      var closed = toggle.querySelector('.eye-closed');
+      if (open) open.hidden = isText;
+      if (closed) closed.hidden = !isText;
+      var label = isText ? 'Hide token' : 'Show token';
+      toggle.setAttribute('aria-label', label);
+      toggle.setAttribute('title', label);
+    });
   }
 
   function showApp() {
@@ -393,7 +483,7 @@ export const DASHBOARD_JS = `(function () {
       await refresh();
     } catch (err) {
       logout();
-      toast(err.message, true);
+      toast(loginMessage(err), true);
     }
   }
 
@@ -406,6 +496,7 @@ export const DASHBOARD_JS = `(function () {
     state.token = input.value.trim();
     if (!state.token) return;
     button.disabled = true;
+    button.textContent = 'Checking...';
     try {
       await api('/v1/apps');
       sessionStorage.setItem(TOKEN_KEY, state.token);
@@ -415,12 +506,14 @@ export const DASHBOARD_JS = `(function () {
       toast('Connected');
     } catch (err) {
       state.token = '';
-      errorEl.textContent = err.message;
+      errorEl.textContent = loginMessage(err);
       errorEl.hidden = false;
     } finally {
       button.disabled = false;
+      button.textContent = 'Open dashboard';
     }
   });
 
+  bindLoginToggle();
   start();
 })();`;

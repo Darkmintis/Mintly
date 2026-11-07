@@ -187,6 +187,56 @@ button, input, select { font: inherit; color: inherit; }
   font-size: 13px;
 }
 
+.field-wrap { position: relative; }
+.field-wrap .field { padding-right: 46px; }
+
+.field-toggle {
+  position: absolute;
+  top: 50%;
+  right: 7px;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--faint);
+  cursor: pointer;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+
+.field-toggle:hover { color: var(--accent); background: rgba(94, 234, 212, 0.08); }
+
+.error-panel {
+  display: grid;
+  gap: 8px;
+  padding: 26px 24px;
+  border: 1px solid rgba(251, 113, 133, 0.28);
+  border-radius: var(--radius);
+  background: linear-gradient(180deg, rgba(251, 113, 133, 0.08), rgba(251, 113, 133, 0.03));
+}
+
+.error-title { color: #fecdd3; font-size: 15px; font-weight: 650; }
+.error-hint { max-width: 560px; color: var(--muted); font-size: 13px; }
+.error-actions { margin-top: 4px; display: flex; gap: 10px; }
+
+.retry-btn {
+  height: 34px;
+  padding: 0 14px;
+  border-radius: 9px;
+  border: 1px solid var(--border);
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.retry-btn:hover { background: rgba(94, 234, 212, 0.16); }
+
 .login-foot {
   margin-top: 18px;
   padding-top: 16px;
@@ -641,6 +691,7 @@ button, input, select { font: inherit; color: inherit; }
 
 .settings-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 14px 0; border-bottom: 1px solid rgba(255, 255, 255, 0.04); }
 .settings-row:last-child { border-bottom: 0; }
+.settings-row .select { min-width: 180px; }
 
 /* ---------- Skeleton & toast -------------------------------------------- */
 
