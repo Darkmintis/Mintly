@@ -1,0 +1,25 @@
+name: CI
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Unit + API tests (no dependencies)
+        run: node --test tests/
+
+      - name: Worker entry imports cleanly
+        run: node -e "import('./src/index.js').then(() => console.log('worker entry ok'))"
+
+      - name: Setup script renders commands in dry-run
+        run: node scripts/setup.mjs --dry-run --skip-deploy

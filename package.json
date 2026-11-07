@@ -1,0 +1,36 @@
+{
+  "name": "mintly",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Privacy-first anonymous product analytics for Cloudflare Workers. Clicks, opens, and counts — no cookies, no identifiers, no third parties.",
+  "type": "module",
+  "license": "MIT",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "setup": "node scripts/setup.mjs",
+    "test": "node --test tests/",
+    "mintly": "node cli/mintly.mjs",
+    "mcp": "node mcp/server.mjs",
+    "db:migrate": "wrangler d1 migrations apply mintly --remote",
+    "db:migrate:local": "wrangler d1 migrations apply mintly --local"
+  },
+  "bin": {
+    "mintly": "./cli/mintly.mjs"
+  },
+  "keywords": [
+    "analytics",
+    "privacy",
+    "cloudflare-workers",
+    "d1",
+    "anonymous",
+    "self-hosted"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Darkmintis/Mintly.git"
+  }
+}
