@@ -10,7 +10,7 @@ import { authenticate } from '../auth.js';
 import { upsertEvent, getRegistry } from '../db.js';
 import { checkRateLimit, clientIp } from '../ratelimit.js';
 import { INGEST_CORS, error, noContent } from '../http.js';
-import { utcDay, validateEventBody } from '../validate.js';
+import { dayKey, parseTz, validateEventBody } from '../validate.js';
 
 const RATE_LIMIT_PER_MINUTE = 240;
 
@@ -57,7 +57,15 @@ export async function handleEvent(request, env) {
     return error(400, `Unregistered dim1 for ${auth.app}/${event}: ${dim1}`, INGEST_CORS);
   }
 
-  await upsertEvent(env, { app: auth.app, day: utcDay(), event, dim1, dim2, count });
+  await upsertEvent(env, {
+    app: auth.app,
+    // Bucket by the sender's local calendar day; the offset itself is not stored.
+    day: dayKey(new Date(), parseTz(request.headers.get('X-Mintly-Tz'))),
+    event,
+    dim1,
+    dim2,
+    count,
+  });
 
   // 202: accepted and counted; the SDK never waits on the result.
   return noContent(202, INGEST_CORS);

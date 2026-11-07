@@ -38,9 +38,11 @@ class Mintly {
       await http
           .post(
             Uri.parse('$url/v1/event'),
-            headers: const {
+            headers: {
               'Content-Type': 'application/json',
               'X-App-Key': key,
+              // Local-day bucketing; the offset itself is never stored.
+              'X-Mintly-Tz': '${-DateTime.now().timeZoneOffset.inMinutes}',
             },
             body: jsonEncode({
               'event': event,

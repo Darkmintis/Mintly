@@ -24,6 +24,9 @@ export function createMintly({ url, key, app, fetchImpl, ...options }) {
   const doFetch = fetchImpl ?? (typeof fetch === 'function' ? fetch : null);
   if (!doFetch) throw new Error('mintly: no fetch implementation available');
 
+  // Sent with every event so the Worker buckets by the user's local day.
+  const timezoneOffset = String(-new Date().getTimezoneOffset());
+
   let queue = [];
   let timer = null;
   let inFlight = 0;
@@ -52,7 +55,11 @@ export function createMintly({ url, key, app, fetchImpl, ...options }) {
       await doFetch(endpoint, {
         method: 'POST',
         keepalive: true,
-        headers: { 'Content-Type': 'application/json', 'X-App-Key': key },
+        headers: {
+          'Content-Type': 'application/json',
+          'X-App-Key': key,
+          'X-Mintly-Tz': timezoneOffset,
+        },
         body: JSON.stringify(entry),
       });
     } catch {

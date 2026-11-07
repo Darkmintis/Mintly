@@ -41,7 +41,11 @@ export async function flush() {
   const batch = queue.splice(0, MAX_BATCH);
   await Promise.allSettled(batch.map((entry) => fetch(config.url + '/v1/event', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'X-App-Key': config.key },
+    headers: {
+      'Content-Type': 'application/json',
+      'X-App-Key': config.key,
+      'X-Mintly-Tz': String(-new Date().getTimezoneOffset()),
+    },
     body: JSON.stringify(entry),
   }).catch(() => undefined)));
 }

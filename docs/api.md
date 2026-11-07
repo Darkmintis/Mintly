@@ -29,8 +29,12 @@ curl -X POST "$MINTLY_URL/v1/event" \
 | `dim2` | string | optional second dimension (platform, version…) |
 | `count` | integer | 1–100, default 1 |
 
-The app identity and the UTC day are assigned by the server. Clients cannot
-send timestamps or app names.
+Optional header `X-Mintly-Tz`: the sender's timezone offset in minutes (east
+positive, `-840`…`840`). It is used only to pick the local calendar day and is
+**never stored** — the row keeps a date, not a timezone.
+
+The app identity and the local calendar day are assigned by the server. Clients
+cannot send timestamps or app names.
 
 Responses: `202` accepted · `400` invalid body · `401` bad app key ·
 `429` rate limited (240 requests/minute per app + IP, per isolate) · `405`.
@@ -95,12 +99,14 @@ events whose `dim1` is not listed for that event.
 ## `GET /v1/stats?days=7&app=blink` — aggregates
 
 `Authorization: Bearer $STATS_TOKEN` — `days` is 1–365 (default
-`DEFAULT_RANGE_DAYS`), `app` is optional.
+`DEFAULT_RANGE_DAYS`), `app` is optional, and `tz` is the viewer's timezone
+offset in minutes (east positive, optional) so day buckets match local time.
 
 ```json
 {
   "generatedAt": "2026-11-07T10:00:00.000Z",
   "rangeDays": 7,
+  "timezoneOffsetMinutes": 345,
   "days": ["2026-11-01", "…", "2026-11-07"],
   "total": 1234,
   "apps": [
@@ -111,12 +117,16 @@ events whose `dim1` is not listed for that event.
       "today": 87,
       "series": [{ "day": "2026-11-01", "count": 121 }],
       "events": [{ "event": "ui_click", "count": 900 }],
+      "buttons": [{ "dim1": "home.red_button", "count": 620 }],
       "top": [{ "event": "ui_click", "dim1": "home.red_button", "count": 620 }],
       "unregistered": []
     }
   ]
 }
 ```
+
+`top` is every dimension across events; `buttons` is the same list filtered to
+`ui_click` targets — use `buttons` for "which button is clicked most".
 
 `unregistered` lists labels not declared in the registry (typos are visible).
 Because only counts exist, a click-through proxy is `ui_click ÷ screen_view`;

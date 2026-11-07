@@ -24,7 +24,11 @@
         fetch(endpoint(), {
           method: 'POST',
           keepalive: true,
-          headers: { 'Content-Type': 'application/json', 'X-App-Key': config.key },
+          headers: {
+            'Content-Type': 'application/json',
+            'X-App-Key': config.key,
+            'X-Mintly-Tz': String(-new Date().getTimezoneOffset())
+          },
           body: JSON.stringify(entry)
         }).catch(function () {});
       } catch (e) { /* ignore */ }

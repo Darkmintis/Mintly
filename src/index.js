@@ -97,6 +97,9 @@ export default {
 };
 
 async function withScope(request, env, scopes, handler) {
+  if (!env.STATS_TOKEN || !env.ADMIN_TOKEN) {
+    return error(503, 'Mintly is not configured yet: set STATS_TOKEN and ADMIN_TOKEN as Worker secrets.');
+  }
   const auth = await authenticate(request, env);
   if (!auth || !hasScope(auth, ...scopes)) {
     return error(401, 'Unauthorized: send Authorization: Bearer <STATS_TOKEN or ADMIN_TOKEN>');

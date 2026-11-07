@@ -10,7 +10,7 @@ import { buildStats } from '../aggregate.js';
 import { getRegistry, listApps, selectStatsRows } from '../db.js';
 import { error, json } from '../http.js';
 import { checkRateLimit, clientIp } from '../ratelimit.js';
-import { dayRange, isValidApp, parseDays } from '../validate.js';
+import { dayRange, isValidApp, parseDays, parseTz } from '../validate.js';
 
 const RATE_LIMIT_PER_MINUTE = 240;
 
@@ -53,7 +53,8 @@ export async function handleStats(request, env, url) {
 
   const fallbackDays = Number.parseInt(env.DEFAULT_RANGE_DAYS ?? '7', 10) || 7;
   const days = parseDays(url.searchParams.get('days'), fallbackDays);
-  const dayKeys = dayRange(days);
+  const tz = parseTz(url.searchParams.get('tz'));
+  const dayKeys = dayRange(days, new Date(), tz);
 
   const allApps = await listApps(env);
   const apps = appFilter ? allApps.filter((entry) => entry.app === appFilter) : allApps;
@@ -73,6 +74,7 @@ export async function handleStats(request, env, url) {
   return json({
     generatedAt: new Date().toISOString(),
     rangeDays: days,
+    timezoneOffsetMinutes: tz,
     ...stats,
   });
 }
@@ -83,7 +85,8 @@ export async function handleExport(request, env, url) {
   if (!isValidApp(appFilter)) return error(400, 'Invalid app slug');
 
   const days = parseDays(url.searchParams.get('days'), 30);
-  const dayKeys = dayRange(days);
+  const tz = parseTz(url.searchParams.get('tz'));
+  const dayKeys = dayRange(days, new Date(), tz);
   const rows = await selectStatsRows(env, { fromDay: dayKeys[0], app: appFilter });
 
   const header = 'app,day,event,dim1,dim2,count';

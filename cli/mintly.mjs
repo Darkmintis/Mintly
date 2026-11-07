@@ -78,7 +78,15 @@ async function request(parsed, path, { method = 'GET', body, kind = 'stats' } = 
   let payload;
   try { payload = text ? JSON.parse(text) : undefined; } catch { payload = undefined; }
   if (!response.ok) {
-    fail(`HTTP ${response.status}: ${payload?.error ?? text ?? response.statusText}`, response.status === 400 || response.status === 409 ? EXIT.VALIDATION : EXIT.NETWORK);
+    let message = payload?.error ?? (text || response.statusText);
+    if (response.status === 401) {
+      message += ` (check ${kind === 'admin' ? 'MINTLY_ADMIN_TOKEN' : 'MINTLY_STATS_TOKEN'} and MINTLY_URL)`;
+    } else if (response.status === 429) {
+      message += ' (rate limited — retry in a minute)';
+    } else if (response.status === 503) {
+      message += ' (run `npm run setup` to create the Worker secrets)';
+    }
+    fail(`HTTP ${response.status}: ${message}`, response.status === 400 || response.status === 409 ? EXIT.VALIDATION : EXIT.NETWORK);
   }
   return payload;
 }
@@ -184,6 +192,7 @@ async function main() {
     const days = parsed.values.days ?? '7';
     if (parsed.values.app) search.set('app', String(parsed.values.app));
     search.set('days', String(days));
+    search.set('tz', String(-new Date().getTimezoneOffset()));
     const data = await request(parsed, `/v1/stats?${search.toString()}`);
     if (parsed.values.json) return printJson(data);
 
@@ -191,12 +200,11 @@ async function main() {
     for (const app of data.apps) {
       process.stdout.write(`\n${app.name} (${app.app}) — ${app.total} events in ${data.rangeDays}d\n`);
       if (group === 'dim1') {
-        const rows = app.top.map((entry) => ({ label: entry.dim1, event: entry.event, count: entry.count }));
+        const rows = app.buttons.map((entry) => ({ label: entry.dim1, count: entry.count }));
         if (rows.length === 0) { process.stdout.write('  no button activity yet\n'); continue; }
         printTable(rows, [
-          { key: 'event', label: 'event' },
           { key: 'label', label: 'button' },
-          { key: 'count', label: 'count' },
+          { key: 'count', label: 'clicks' },
         ]);
       } else {
         if (app.events.length === 0) { process.stdout.write('  no activity yet\n'); continue; }
@@ -213,6 +221,7 @@ async function main() {
     const app = rest[0];
     if (!app) fail('usage: mintly export <app> [--days 30] [--out file.csv]');
     const search = new URLSearchParams({ app, days: String(parsed.values.days ?? '30') });
+    search.set('tz', String(-new Date().getTimezoneOffset()));
     const url = requireUrl(parsed) + `/v1/export.csv?${search.toString()}`;
     let response;
     try {

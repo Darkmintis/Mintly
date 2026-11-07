@@ -12,17 +12,31 @@ export const MAX_COUNT = 100;
 export const MAX_DIMS = 50;
 export const MAX_DAYS = 365;
 
-/** UTC day key, e.g. "2026-11-07". The server owns the clock; clients never send it. */
+/** UTC day key, e.g. "2026-11-07". */
 export function utcDay(date = new Date()) {
   return date.toISOString().slice(0, 10);
 }
 
-/** The last `days` UTC day keys, oldest first, ending today. */
-export function dayRange(days, now = new Date()) {
+/** Parse a client timezone offset in minutes (east positive). Invalid → UTC. */
+export function parseTz(raw) {
+  const n = Number.parseInt(raw ?? '', 10);
+  if (!Number.isInteger(n) || Math.abs(n) > 840) return 0;
+  return n;
+}
+
+/**
+ * Day key in the sender's local calendar. The offset is used only to pick the
+ * bucket and is never stored — the row keeps a date, not a timezone.
+ */
+export function dayKey(date = new Date(), tzOffsetMinutes = 0) {
+  return utcDay(new Date(date.getTime() + tzOffsetMinutes * 60_000));
+}
+
+/** The last `days` day keys for a timezone offset, oldest first, ending today. */
+export function dayRange(days, now = new Date(), tzOffsetMinutes = 0) {
   const out = [];
   for (let i = days - 1; i >= 0; i -= 1) {
-    const d = new Date(now.getTime() - i * 86_400_000);
-    out.push(utcDay(d));
+    out.push(dayKey(new Date(now.getTime() - i * 86_400_000), tzOffsetMinutes));
   }
   return out;
 }

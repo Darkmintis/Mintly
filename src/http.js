@@ -14,7 +14,7 @@ export function error(status, message, headers = {}) {
 export const INGEST_CORS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type, X-App-Key',
+  'Access-Control-Allow-Headers': 'Content-Type, X-App-Key, X-Mintly-Tz',
   'Access-Control-Max-Age': '86400',
 };
 
