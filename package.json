@@ -10,6 +10,7 @@
   },
   "scripts": {
     "dev": "wrangler dev",
+    "preview": "node scripts/preview.mjs",
     "deploy": "wrangler deploy",
     "setup": "node scripts/setup.mjs",
     "test": "node --test tests/",
