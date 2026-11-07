@@ -1,0 +1,21 @@
+{
+  "name": "@darkmintis/mintly",
+  "version": "0.1.0",
+  "description": "Tiny SDK for Mintly — privacy-first anonymous analytics. Clicks, app opens, counts. No cookies, no identifiers.",
+  "type": "module",
+  "main": "index.js",
+  "exports": {
+    ".": "./index.js"
+  },
+  "files": ["index.js", "README.md"],
+  "license": "MIT",
+  "keywords": ["analytics", "privacy", "anonymous", "cloudflare"],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Darkmintis/Mintly.git",
+    "directory": "sdk/js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
